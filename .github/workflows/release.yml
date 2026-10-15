@@ -1,0 +1,43 @@
+name: Release
+
+# Push a tag like v1.0.0 to build the DMG and publish it as a GitHub release.
+# Manual runs build the DMG and attach it to the workflow run as an artifact.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build DMG
+        env:
+          UNIVERSAL: "1"
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.0.0-dev.${GITHUB_RUN_NUMBER}"
+          fi
+          ./make-dmg.sh "$VERSION"
+          lipo -info "build/Look Away.app/Contents/MacOS/LookAway"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LookAway-dmg
+          path: build/*.dmg
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" build/*.dmg \
+            --title "Look Away $GITHUB_REF_NAME" \
+            --generate-notes
