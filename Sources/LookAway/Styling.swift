@@ -19,6 +19,7 @@ enum Palette {
     static let peach = Color(hex: 0xEE8B5F)
     static let navyTop = Color(hex: 0x1C1B4D)
     static let navyBottom = Color(hex: 0x121035)
+    static let water = Color(hex: 0x5AC8FA)
 }
 
 extension NSImage {
@@ -130,4 +131,20 @@ struct ClockBadge: View {
 func formatClock(_ seconds: TimeInterval) -> String {
     let s = max(0, Int(seconds.rounded(.up)))
     return String(format: "%02d:%02d", s / 60, s % 60)
+}
+
+/// Small keyboard-key badge used to show shortcuts.
+struct KeyCap: View {
+    let label: String
+    init(_ label: String) { self.label = label }
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 11, weight: .semibold, design: .rounded))
+            .foregroundStyle(.white.opacity(0.75))
+            .frame(minWidth: 20, minHeight: 20)
+            .padding(.horizontal, 3)
+            .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(0.1)))
+            .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
+    }
 }

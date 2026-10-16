@@ -6,6 +6,10 @@ final class BreakOverlayModel: ObservableObject {
     static let range = 5...60
 
     @Published var adjusting = false
+    /// This break is also a water break: offer the "I drank water" button.
+    @Published var water = false
+    /// Shown in place of the button once a glass is logged.
+    @Published var waterNote: String?
     @Published private(set) var duration = 10
 
     /// Set without feedback (e.g. when the overlay opens).
@@ -37,6 +41,7 @@ struct BreakView: View {
     let onSkip: () -> Void
     let onAdjust: () -> Void
     let onApply: () -> Void
+    let onDrankWater: () -> Void
 
     var body: some View {
         ZStack {
@@ -54,6 +59,7 @@ struct BreakView: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: model.adjusting)
+        .animation(.easeOut(duration: 0.2), value: model.waterNote)
         .environment(\.colorScheme, .dark)
     }
 
@@ -71,6 +77,23 @@ struct BreakView: View {
                     .foregroundStyle(.white.opacity(0.4))
             }
             .padding(.top, 8)
+
+            if let note = model.waterNote {
+                Label(note, systemImage: "drop.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Palette.water.opacity(0.9))
+                    .transition(.opacity)
+            } else if model.water {
+                Button(action: onDrankWater) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "drop.fill").foregroundStyle(Palette.water)
+                        Text("I drank water")
+                        KeyCap("W")
+                    }
+                }
+                .buttonStyle(PillButtonStyle())
+                .transition(.opacity)
+            }
 
             Button(action: onAdjust) {
                 HStack(spacing: 6) {
@@ -115,21 +138,6 @@ struct BreakView: View {
         }
         .font(.system(size: 12))
         .foregroundStyle(.white.opacity(0.5))
-    }
-}
-
-private struct KeyCap: View {
-    let label: String
-    init(_ label: String) { self.label = label }
-
-    var body: some View {
-        Text(label)
-            .font(.system(size: 11, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white.opacity(0.75))
-            .frame(minWidth: 20, minHeight: 20)
-            .padding(.horizontal, 3)
-            .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(0.1)))
-            .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
     }
 }
 
@@ -226,6 +234,8 @@ final class BreakOverlayController {
     /// Dial opened (true) or closed (false); the break countdown is held while open.
     var onAdjustingChange: ((Bool) -> Void)?
     var onDurationApply: ((Int) -> Void)?
+    /// Logs a glass and returns today's total.
+    var onDrankWater: (() -> Int)?
 
     private let model = BreakOverlayModel()
     private var windows: [NSWindow] = []
@@ -235,10 +245,12 @@ final class BreakOverlayController {
 
     var isVisible: Bool { !windows.isEmpty }
 
-    func show(breakDuration: Int) {
+    func show(breakDuration: Int, water: Bool) {
         guard windows.isEmpty else { return }
         model.load(breakDuration)
         model.adjusting = false
+        model.water = water
+        model.waterNote = nil
 
         let front = NSWorkspace.shared.frontmostApplication
         previousApp = front?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : front
@@ -314,6 +326,12 @@ final class BreakOverlayController {
         onAdjustingChange?(false)
     }
 
+    private func drankWater() {
+        guard let count = onDrankWater?() else { return }
+        TickFeedback.shared.tick()
+        model.waterNote = "Nice. \(count) of \(WaterLog.dailyGoal) glasses today"
+    }
+
     // MARK: - Input
 
     private func handleKey(_ event: NSEvent) -> NSEvent? {
@@ -324,6 +342,7 @@ final class BreakOverlayController {
             switch (event.keyCode, key) {
             case (53, _): onSkip?()          // Esc
             case (_, "t"): beginAdjust()
+            case (_, "w") where model.water && model.waterNote == nil: drankWater()
             default: return event
             }
             return nil
@@ -377,7 +396,8 @@ final class BreakOverlayController {
             model: model,
             onSkip: { [weak self] in self?.onSkip?() },
             onAdjust: { [weak self] in self?.beginAdjust() },
-            onApply: { [weak self] in self?.apply() }
+            onApply: { [weak self] in self?.apply() },
+            onDrankWater: { [weak self] in self?.drankWater() }
         )
         let hosting = NSHostingView(rootView: view)
         hosting.frame = effect.bounds

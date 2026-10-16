@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         overlay.onSkip = { [weak self] in self?.scheduler.skipBreak() }
         overlay.onAdjustingChange = { [weak self] held in self?.scheduler.holdBreak(held) }
         overlay.onDurationApply = { [weak self] s in self?.scheduler.setBreakDuration(TimeInterval(s)) }
+        overlay.onDrankWater = { [weak self] in self?.logWater() ?? WaterLog.today }
 
         scheduler.onPhaseChange = { [weak self] old, new in
             guard let self else { return }
@@ -49,10 +50,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 reminder.show(
                     remaining: scheduler.remaining,
                     total: scheduler.config.warningLead,
-                    breakDuration: scheduler.config.breakDuration
+                    breakDuration: scheduler.config.breakDuration,
+                    water: scheduler.waterDue
                 )
             case .onBreak:
-                overlay.show(breakDuration: Int(scheduler.config.breakDuration))
+                overlay.show(breakDuration: Int(scheduler.config.breakDuration), water: scheduler.isWaterBreak)
             case .working:
                 break
             }
@@ -113,7 +115,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 symbol = "eyes"
                 title = " " + formatClock(scheduler.remaining)
             case .working:
-                symbol = "eyes"
+                // A water break went by without a logged glass: the eyes become a drop until logged.
+                symbol = scheduler.waterPending ? "drop.fill" : "eyes"
                 let r = scheduler.remaining
                 title = r >= 60 ? " \(Int((r / 60).rounded(.up)))m" : " \(Int(r.rounded(.up)))s"
             }
@@ -135,6 +138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .onBreak: return "Break in progress"
         case .warning: return "Break starting…"
         case .working:
+            if scheduler.waterPending { return "Time for some water" }
             let r = scheduler.remaining
             return r >= 60
                 ? "Next break in \(Int((r / 60).rounded(.up))) min"
@@ -152,10 +156,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(statusLine)
         menu.addItem(.separator())
 
+        let waterCount = NSMenuItem(title: "Water today: \(WaterLog.today) / \(WaterLog.dailyGoal) glasses",
+                                    action: nil, keyEquivalent: "")
+        waterCount.image = NSImage(systemSymbolName: "drop.fill", accessibilityDescription: nil)
+        waterCount.isEnabled = false
+        menu.addItem(waterCount)
+        menu.addItem(item("I Drank Water", #selector(drankWaterFromMenu), key: "w"))
+        menu.addItem(.separator())
+
         let breakNow = item("Take a Break Now", #selector(takeBreakNow), key: "b")
         breakNow.isEnabled = !scheduler.isPaused && scheduler.phase != .onBreak
         menu.addItem(breakNow)
         menu.addItem(item("Reset Timer", #selector(resetTimer), key: "r"))
+        menu.addItem(.separator())
+
+        let timersHeader = NSMenuItem(title: "Timers", action: nil, keyEquivalent: "")
+        timersHeader.isEnabled = false
+        menu.addItem(timersHeader)
+        menu.addItem(.stepper(title: "Screen time", value: minutes(scheduler.config.workInterval)) { [weak self] dir in
+            guard let self else { return "" }
+            scheduler.setWorkInterval(Self.snap(scheduler.config.workInterval, step: 5 * 60, dir: dir))
+            return minutes(scheduler.config.workInterval)
+        })
+        menu.addItem(.stepper(title: "Look away", value: seconds(scheduler.config.breakDuration)) { [weak self] dir in
+            guard let self else { return "" }
+            scheduler.setBreakDuration(Self.snap(scheduler.config.breakDuration, step: 5, dir: dir))
+            return seconds(scheduler.config.breakDuration)
+        })
+        menu.addItem(.stepper(title: "Water break", value: minutes(scheduler.config.waterInterval)) { [weak self] dir in
+            guard let self else { return "" }
+            scheduler.setWaterInterval(Self.snap(scheduler.config.waterInterval, step: 15 * 60, dir: dir))
+            return minutes(scheduler.config.waterInterval)
+        })
         menu.addItem(.separator())
 
         if scheduler.isPaused {
@@ -180,11 +212,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(item("Quit Look Away", #selector(quit), key: "q"))
     }
 
+    /// Next multiple of `step` in direction `dir`, so odd values (e.g. 9 s from the dial) land on the grid.
+    private static func snap(_ value: TimeInterval, step: TimeInterval, dir: Int) -> TimeInterval {
+        dir > 0
+            ? (value / step).rounded(.down) * step + step
+            : (value / step).rounded(.up) * step - step
+    }
+
+    private func minutes(_ s: TimeInterval) -> String { "\(Int(s / 60)) min" }
+    private func seconds(_ s: TimeInterval) -> String { "\(Int(s)) s" }
+
     private func item(_ title: String, _ action: Selector, key: String) -> NSMenuItem {
         let i = NSMenuItem(title: title, action: action, keyEquivalent: key)
         i.target = self
         return i
     }
+
+    @discardableResult
+    private func logWater() -> Int {
+        let count = WaterLog.addGlass()
+        scheduler.drankWater()
+        return count
+    }
+
+    @objc private func drankWaterFromMenu() { logWater() }
 
     @objc private func takeBreakNow() { scheduler.startBreak() }
     @objc private func resetTimer() { scheduler.resetCycle() }

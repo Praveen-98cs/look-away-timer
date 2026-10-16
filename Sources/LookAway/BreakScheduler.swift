@@ -7,6 +7,10 @@ import Foundation
 /// the following resets the cycle back to a full interval:
 ///   - the screen locks, the display sleeps, the Mac sleeps, or the screensaver starts
 ///   - the user is idle (no keyboard / mouse input) for `idleReset` seconds
+///
+/// It also runs a slower water timer on the same active-use clock. When water is due,
+/// the next eye break doubles as a water break. Locking only pauses the water timer;
+/// being away for `waterAwayReset` resets it (the user probably had a drink).
 final class BreakScheduler {
     enum Phase: Equatable {
         case working   // counting down to the next break
@@ -19,18 +23,34 @@ final class BreakScheduler {
         var breakDuration: TimeInterval
         var warningLead: TimeInterval
         var idleReset: TimeInterval
+        var waterInterval: TimeInterval
+        var waterAwayReset: TimeInterval
 
         static let breakDurationKey = "breakDuration"
+        static let workIntervalKey = "workInterval"
+        static let waterIntervalKey = "waterInterval"
         static let breakDurationRange: ClosedRange<TimeInterval> = 5...60
+        static let workIntervalRange: ClosedRange<TimeInterval> = 5 * 60...90 * 60
+        static let waterIntervalRange: ClosedRange<TimeInterval> = 15 * 60...180 * 60
 
         static var standard: Config {
+            let defaults = UserDefaults.standard
             // LOOKAWAY_DEBUG=1 shortens everything so the flow can be checked quickly.
-            var config = ProcessInfo.processInfo.environment["LOOKAWAY_DEBUG"] != nil
-                ? Config(workInterval: 30, breakDuration: 10, warningLead: 5, idleReset: 45)
-                : Config(workInterval: 20 * 60, breakDuration: 10, warningLead: 5, idleReset: 5 * 60)
-            // Break length chosen with the dial on the overlay.
-            let saved = UserDefaults.standard.double(forKey: breakDurationKey)
-            if breakDurationRange.contains(saved) { config.breakDuration = saved }
+            let debug = ProcessInfo.processInfo.environment["LOOKAWAY_DEBUG"] != nil
+            var config = debug
+                ? Config(workInterval: 30, breakDuration: 10, warningLead: 5, idleReset: 45,
+                         waterInterval: 50, waterAwayReset: 90)
+                : Config(workInterval: 20 * 60, breakDuration: 10, warningLead: 5, idleReset: 5 * 60,
+                         waterInterval: 60 * 60, waterAwayReset: 30 * 60)
+            // Values chosen in the menu / overlay dial. Debug mode keeps its short intervals.
+            let breakDuration = defaults.double(forKey: breakDurationKey)
+            if breakDurationRange.contains(breakDuration) { config.breakDuration = breakDuration }
+            if !debug {
+                let work = defaults.double(forKey: workIntervalKey)
+                if workIntervalRange.contains(work) { config.workInterval = work }
+                let water = defaults.double(forKey: waterIntervalKey)
+                if waterIntervalRange.contains(water) { config.waterInterval = water }
+            }
             return config
         }
     }
@@ -46,6 +66,15 @@ final class BreakScheduler {
     private(set) var pausedUntil: Date?
     /// Break countdown is frozen while the user adjusts the break length on the overlay.
     private(set) var breakHeld = false
+
+    private(set) var waterWorked: TimeInterval = 0
+    /// Water timer has elapsed; the next eye break will mention water.
+    var waterDue: Bool { waterWorked >= config.waterInterval }
+    /// A water break has been shown but no glass was logged yet (menu bar shows a drop).
+    private(set) var waterPending = false
+    /// The running (or about to start) break is also a water break.
+    private(set) var isWaterBreak = false
+    private var suspendedAt: Date?
 
     private var suspendReasons = Set<String>()
     private var lastTick = Date()
@@ -76,6 +105,8 @@ final class BreakScheduler {
     func startBreak() {
         guard !isPaused else { return }
         breakRemaining = config.breakDuration
+        isWaterBreak = waterDue
+        if isWaterBreak { waterPending = true }
         phase = .onBreak
         onTick?()
     }
@@ -97,6 +128,39 @@ final class BreakScheduler {
         onTick?()
     }
 
+    /// Saves a new screen-time interval and applies it to the running cycle.
+    func setWorkInterval(_ seconds: TimeInterval) {
+        let value = Self.clamp(seconds, Config.workIntervalRange)
+        config.workInterval = value
+        UserDefaults.standard.set(value, forKey: Config.workIntervalKey)
+        // Never drop straight into a break because the interval shrank below time already worked.
+        if phase == .working { target = max(value, worked + 60) }
+        onTick?()
+    }
+
+    func setWaterInterval(_ seconds: TimeInterval) {
+        let value = Self.clamp(seconds, Config.waterIntervalRange)
+        config.waterInterval = value
+        UserDefaults.standard.set(value, forKey: Config.waterIntervalKey)
+        onTick?()
+    }
+
+    private static func clamp(_ v: TimeInterval, _ range: ClosedRange<TimeInterval>) -> TimeInterval {
+        min(max(v, range.lowerBound), range.upperBound)
+    }
+
+    /// User logged a glass: start the water timer over.
+    func drankWater() {
+        resetWater()
+        onTick?()
+    }
+
+    private func resetWater() {
+        waterWorked = 0
+        waterPending = false
+        isWaterBreak = false
+    }
+
     func snooze(_ seconds: TimeInterval) {
         target = worked + seconds
         phase = .working
@@ -108,6 +172,7 @@ final class BreakScheduler {
         target = config.workInterval
         breakRemaining = 0
         breakHeld = false
+        isWaterBreak = false
         phase = .working
         onTick?()
     }
@@ -125,16 +190,23 @@ final class BreakScheduler {
 
     /// Stop counting (lock, sleep, ...) and start over from a full interval.
     func suspend(_ reason: String) {
+        if suspendReasons.isEmpty { suspendedAt = Date() }
         suspendReasons.insert(reason)
         resetCycle()
     }
 
     func unsuspend(_ reason: String) {
         guard suspendReasons.remove(reason) != nil else { return }
-        if !isSuspended {
-            lastTick = Date()
-            resetCycle()
+        if !isSuspended { returnFromAway() }
+    }
+
+    private func returnFromAway() {
+        if let since = suspendedAt, Date().timeIntervalSince(since) >= config.waterAwayReset {
+            resetWater()
         }
+        suspendedAt = nil
+        lastTick = Date()
+        resetCycle()
     }
 
     // MARK: - Tick
@@ -156,23 +228,27 @@ final class BreakScheduler {
             // the user is clearly back if there is fresh input on an unlocked screen.
             if Self.idleSeconds() < 2, !Self.isScreenLocked() {
                 suspendReasons.removeAll()
-                resetCycle()
+                returnFromAway()
             }
             return
         }
 
         switch phase {
         case .onBreak:
+            waterWorked += dt
             guard !breakHeld else { return }
             breakRemaining -= dt
             if breakRemaining <= 0 { resetCycle() }
         case .working, .warning:
-            if Self.idleSeconds() >= config.idleReset {
+            let idle = Self.idleSeconds()
+            if idle >= config.idleReset {
                 // User walked away long enough – that counts as a rest.
                 if worked > 0 || phase != .working { resetCycle() }
+                if idle >= config.waterAwayReset, waterWorked > 0 || waterPending { resetWater() }
                 return
             }
             worked += dt
+            waterWorked += dt
             if remaining <= 0 {
                 startBreak()
             } else if remaining <= config.warningLead {
