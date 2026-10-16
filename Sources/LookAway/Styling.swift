@@ -20,6 +20,8 @@ enum Palette {
     static let navyTop = Color(hex: 0x1C1B4D)
     static let navyBottom = Color(hex: 0x121035)
     static let water = Color(hex: 0x5AC8FA)
+    static let mint = Color(hex: 0x4FE3B5)
+    static let teal = Color(hex: 0x1FA2C4)
 }
 
 extension NSImage {
