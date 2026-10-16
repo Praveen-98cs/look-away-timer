@@ -10,6 +10,8 @@ final class BreakOverlayModel: ObservableObject {
     @Published var water = false
     /// Shown in place of the button once a glass is logged.
     @Published var waterNote: String?
+    /// Share of the break left, 1 → 0; drives the timeline bar.
+    @Published var progress: Double = 1
     @Published private(set) var duration = 10
 
     /// Set without feedback (e.g. when the overlay opens).
@@ -35,7 +37,8 @@ final class BreakOverlayModel: ObservableObject {
 }
 
 /// Deliberately minimal: no countdown or tips to read, so the eyes go elsewhere.
-/// The reminder pill gives the instructions; a sound marks the end of the break.
+/// The reminder pill gives the instructions; a quiet shrinking bar shows time left
+/// at a glance, and a sound marks the end of the break.
 struct BreakView: View {
     @ObservedObject var model: BreakOverlayModel
     let onSkip: () -> Void
@@ -65,9 +68,12 @@ struct BreakView: View {
 
     private var restContent: some View {
         VStack(spacing: 28) {
-            Text("Nothing here to look at.")
-                .font(.system(size: 30, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.85))
+            VStack(spacing: 20) {
+                Text("Nothing here to look at.")
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                BreakTimeline(progress: model.progress)
+            }
 
             VStack(spacing: 8) {
                 Button("Skip", action: onSkip)
@@ -138,6 +144,30 @@ struct BreakView: View {
         }
         .font(.system(size: 12))
         .foregroundStyle(.white.opacity(0.5))
+    }
+}
+
+/// Thin glowing bar that shrinks from both ends toward the centre as the break runs out.
+private struct BreakTimeline: View {
+    var progress: Double
+    private let width: CGFloat = 280
+
+    var body: some View {
+        ZStack {
+            Capsule()
+                .fill(Color.white.opacity(0.08))
+                .frame(width: width, height: 4)
+            Capsule()
+                .fill(
+                    LinearGradient(colors: [Palette.pink, Palette.coral, Palette.peach],
+                                   startPoint: .leading, endPoint: .trailing)
+                )
+                .frame(width: max(4, width * progress), height: 4)
+                .shadow(color: Palette.pink.opacity(0.55), radius: 6)
+                .opacity(progress > 0 ? 1 : 0)
+        }
+        .frame(width: width, height: 10)
+        .accessibilityHidden(true)
     }
 }
 
@@ -251,6 +281,7 @@ final class BreakOverlayController {
         model.adjusting = false
         model.water = water
         model.waterNote = nil
+        model.progress = 1
 
         let front = NSWorkspace.shared.frontmostApplication
         previousApp = front?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : front
@@ -276,6 +307,16 @@ final class BreakOverlayController {
             ctx.duration = 0.6
             windows.forEach { $0.animator().alphaValue = 1 }
         }
+    }
+
+    /// Called every scheduler tick; animates the bar smoothly between one-second updates.
+    func update(remaining: TimeInterval, total: TimeInterval) {
+        guard total > 0 else { return }
+        let value = max(0, min(1, remaining / total))
+        guard abs(value - model.progress) > 0.0001 else { return }   // held while the dial is open
+        // Refills (new break length applied) ease back; normal ticks drain linearly.
+        let animation: Animation = value > model.progress ? .easeOut(duration: 0.4) : .linear(duration: 1)
+        withAnimation(animation) { model.progress = value }
     }
 
     func hide() {

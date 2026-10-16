@@ -60,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 )
             case .onBreak:
                 overlay.show(breakDuration: Int(scheduler.config.breakDuration), water: scheduler.isWaterBreak)
+                overlay.update(remaining: scheduler.breakRemaining, total: scheduler.config.breakDuration)
             case .working:
                 if scheduler.inCall { posture.hide() }
             }
