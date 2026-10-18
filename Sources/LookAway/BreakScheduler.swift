@@ -50,9 +50,9 @@ final class BreakScheduler {
             // LOOKAWAY_DEBUG=1 shortens everything so the flow can be checked quickly.
             let debug = ProcessInfo.processInfo.environment["LOOKAWAY_DEBUG"] != nil
             var config = debug
-                ? Config(workInterval: 30, breakDuration: 10, warningLead: 5, idleReset: 45,
+                ? Config(workInterval: 30, breakDuration: 20, warningLead: 5, idleReset: 45,
                          waterInterval: 50, waterAwayReset: 90, postureInterval: 15)
-                : Config(workInterval: 20 * 60, breakDuration: 10, warningLead: 5, idleReset: 5 * 60,
+                : Config(workInterval: 20 * 60, breakDuration: 20, warningLead: 5, idleReset: 5 * 60,
                          waterInterval: 60 * 60, waterAwayReset: 30 * 60, postureInterval: 30 * 60)
             // Values chosen in the menu / overlay dial. Debug mode keeps its short intervals.
             let breakDuration = defaults.double(forKey: breakDurationKey)

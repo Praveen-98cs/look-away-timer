@@ -12,7 +12,7 @@ final class BreakOverlayModel: ObservableObject {
     @Published var waterNote: String?
     /// Share of the break left, 1 → 0; drives the timeline bar.
     @Published var progress: Double = 1
-    @Published private(set) var duration = 10
+    @Published private(set) var duration = 20
 
     /// Set without feedback (e.g. when the overlay opens).
     func load(_ seconds: Int) {
@@ -344,7 +344,7 @@ final class BreakOverlayController {
 
     // MARK: - Dial
 
-    private var durationBeforeAdjust = 10
+    private var durationBeforeAdjust = 20
 
     private func beginAdjust() {
         guard !model.adjusting else { return }

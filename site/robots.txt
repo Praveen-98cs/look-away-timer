@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://look-away.pages.dev/sitemap.xml

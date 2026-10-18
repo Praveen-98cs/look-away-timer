@@ -1,7 +1,8 @@
 name: Release
 
-# Push a tag like v1.0.0 to build the DMG and publish it as a GitHub release.
-# Manual runs build the DMG and attach it to the workflow run as an artifact.
+# Push a tag like v1.0.0 to build the DMG, publish it as a GitHub release and
+# deploy the landing page (site/) to Cloudflare Pages.
+# Manual runs build the DMG as a workflow artifact and redeploy the site.
 on:
   push:
     tags: ["v*"]
@@ -27,17 +28,46 @@ jobs:
           fi
           ./make-dmg.sh "$VERSION"
           lipo -info "build/Look Away.app/Contents/MacOS/LookAway"
+          # Unversioned copy so releases/latest/download/LookAway.dmg always works.
+          cp "build/LookAway-${VERSION}.dmg" build/LookAway.dmg
 
       - uses: actions/upload-artifact@v4
         with:
           name: LookAway-dmg
-          path: build/*.dmg
+          path: build/LookAway-*.dmg
 
       - name: Publish release
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" build/*.dmg \
+          gh release create "$GITHUB_REF_NAME" build/LookAway-*.dmg build/LookAway.dmg \
             --title "Look Away $GITHUB_REF_NAME" \
             --generate-notes
+
+  deploy-site:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Stamp version and date
+        # The page ships with real values so it also looks right locally; this refreshes them.
+        run: |
+          VERSION="$(git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)"
+          VERSION="${VERSION#v}"
+          TODAY="$(date -u +%Y-%m-%d)"
+          sed -i -E "s#(<span data-version>)[^<]*(</span>)#\1${VERSION}\2#g; s#(\"softwareVersion\": \")[^\"]*(\")#\1${VERSION}\2#" site/index.html
+          sed -i -E "s#(<lastmod>)[^<]*(</lastmod>)#\1${TODAY}\2#" site/sitemap.xml
+          grep -c "data-version>${VERSION}<" site/index.html
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # First run creates the project; later runs just skip this.
+          preCommands: wrangler pages project create look-away --production-branch=main || true
+          command: pages deploy site --project-name=look-away --branch=main
