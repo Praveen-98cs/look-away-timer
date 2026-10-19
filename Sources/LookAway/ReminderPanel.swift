@@ -6,7 +6,6 @@ final class ReminderModel: ObservableObject {
     @Published var remaining: TimeInterval = 10
     @Published var total: TimeInterval = 10
     @Published var message = ""
-    @Published var water = false
 
     // The instruction lives here, not in the overlay, so nobody reads the overlay during the break.
     static func message(breakDuration: TimeInterval) -> String {
@@ -39,17 +38,6 @@ struct ReminderView: View {
                         .font(.system(size: 16))
                         .foregroundStyle(.white.opacity(0.72))
                         .fixedSize()
-                    if model.water {
-                        HStack(spacing: 6) {
-                            Image(systemName: "drop.fill")
-                                .foregroundStyle(Palette.water)
-                            Text("Good moment to grab some water.")
-                        }
-                        .font(.system(size: 15))
-                        .foregroundStyle(.white.opacity(0.72))
-                        .fixedSize()
-                        .padding(.top, 2)
-                    }
                 }
                 Spacer(minLength: 12)
                 HStack(spacing: 3) {
@@ -111,10 +99,9 @@ final class ReminderPanelController {
 
     var isVisible: Bool { panel != nil }
 
-    func show(remaining: TimeInterval, total: TimeInterval, breakDuration: TimeInterval, water: Bool) {
+    func show(remaining: TimeInterval, total: TimeInterval, breakDuration: TimeInterval) {
         if panel == nil {
             model.message = ReminderModel.message(breakDuration: breakDuration)
-            model.water = water
             model.total = total
             model.remaining = remaining
             present()

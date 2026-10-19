@@ -8,12 +8,9 @@ import Foundation
 ///   - the screen locks, the display sleeps, the Mac sleeps, or the screensaver starts
 ///   - the user is idle (no keyboard / mouse input) for `idleReset` seconds
 ///
-/// It also runs a slower water timer on the same active-use clock. When water is due,
-/// the next eye break doubles as a water break. Locking only pauses the water timer;
-/// being away for `waterAwayReset` resets it (the user probably had a drink).
-///
-/// A posture timer runs on the same clock and fires a short nudge (`onPostureDue`).
-/// Any time away (lock, sleep, idle reset) restarts it, since the user got up.
+/// Water and posture timers run on the same active-use clock and fire short nudges
+/// (`onNudgeDue`). Locking only pauses the water timer; being away for `waterAwayReset`
+/// resets it (the user probably had a drink). Any time away restarts the posture timer.
 final class BreakScheduler {
     enum Phase: Equatable {
         case working   // counting down to the next break
@@ -76,7 +73,11 @@ final class BreakScheduler {
     private(set) var config: Config
 
     private(set) var phase: Phase = .working {
-        didSet { if phase != oldValue { onPhaseChange?(oldValue, phase) } }
+        didSet {
+            guard phase != oldValue else { return }
+            Self.debugLog("phase \(oldValue) -> \(phase)")
+            onPhaseChange?(oldValue, phase)
+        }
     }
     private(set) var worked: TimeInterval = 0
     private(set) var target: TimeInterval
@@ -86,17 +87,11 @@ final class BreakScheduler {
     private(set) var breakHeld = false
 
     private(set) var waterWorked: TimeInterval = 0
-    /// Water timer has elapsed; the next eye break will mention water.
-    var waterDue: Bool { config.waterEnabled && waterWorked >= config.waterInterval }
-    /// A water break has been shown but no glass was logged yet (menu bar shows a drop).
-    private(set) var waterPending = false
-    /// The running (or about to start) break is also a water break.
-    private(set) var isWaterBreak = false
+    private(set) var postureWorked: TimeInterval = 0
     private var suspendedAt: Date?
 
-    private(set) var postureWorked: TimeInterval = 0
-    /// Called when it's time for a posture nudge; only fires while no break UI is up.
-    var onPostureDue: (() -> Void)?
+    /// Called when a water or posture nudge is due; only fires while no break UI is up.
+    var onNudgeDue: ((NudgeKind) -> Void)?
 
     /// Returns true while the user is in a call / presenting (mic, camera or screen share).
     var callCheck: (() -> Bool)?
@@ -124,6 +119,7 @@ final class BreakScheduler {
     }
 
     func start() {
+        Self.debugLog("started")
         lastTick = Date()
         let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.tick() }
         t.tolerance = 0.1
@@ -137,8 +133,6 @@ final class BreakScheduler {
         guard !isPaused else { return }
         manualBreak = manual
         breakRemaining = config.breakDuration
-        isWaterBreak = waterDue
-        if isWaterBreak { waterPending = true }
         phase = .onBreak
         onTick?()
     }
@@ -216,8 +210,6 @@ final class BreakScheduler {
 
     private func resetWater() {
         waterWorked = 0
-        waterPending = false
-        isWaterBreak = false
     }
 
     func snooze(_ seconds: TimeInterval) {
@@ -231,7 +223,6 @@ final class BreakScheduler {
         target = config.workInterval
         breakRemaining = 0
         breakHeld = false
-        isWaterBreak = false
         phase = .working
         onTick?()
     }
@@ -307,8 +298,6 @@ final class BreakScheduler {
             if config.waterEnabled { waterWorked += dt }
             if held, !manualBreak {
                 // A call started (e.g. joining a meeting): get out of the way, offer the break later.
-                waterPending = false
-                isWaterBreak = false
                 breakRemaining = 0
                 breakHeld = false
                 phase = .working
@@ -322,8 +311,11 @@ final class BreakScheduler {
             // In a call the user is watching the screen even without typing, so no idle reset.
             if idle >= config.idleReset, !held {
                 // User walked away long enough – that counts as a rest.
-                if worked > 0 || phase != .working { resetCycle() }
-                if idle >= config.waterAwayReset, waterWorked > 0 || waterPending { resetWater() }
+                if worked > 0 || phase != .working {
+                    Self.debugLog("idle \(Int(idle))s: cycle reset")
+                    resetCycle()
+                }
+                if idle >= config.waterAwayReset { resetWater() }
                 postureWorked = 0
                 return
             }
@@ -339,16 +331,33 @@ final class BreakScheduler {
                 startBreak()
             } else if remaining <= config.warningLead {
                 phase = .warning
-            } else if config.postureEnabled, postureWorked >= config.postureInterval,
-                      remaining > config.warningLead + 10 {
-                // Hold the nudge while a break is about to start; it shows after the break instead.
-                postureWorked = 0
-                onPostureDue?()
+            } else if remaining > config.warningLead + 10 {
+                // Nudges wait while a break is about to start; they show after it instead.
+                if config.waterEnabled, waterWorked >= config.waterInterval {
+                    waterWorked = 0
+                    Self.debugLog("nudge water")
+                    onNudgeDue?(.water)
+                }
+                if config.postureEnabled, postureWorked >= config.postureInterval {
+                    postureWorked = 0
+                    Self.debugLog("nudge posture")
+                    onNudgeDue?(.posture)
+                }
             }
         }
     }
 
     // MARK: - System state helpers
+
+    private static let debugStart = Date()
+    private static let debugEnabled = ProcessInfo.processInfo.environment["LOOKAWAY_DEBUG"] != nil
+
+    /// Timeline log for LOOKAWAY_DEBUG runs; silent otherwise.
+    static func debugLog(_ message: @autoclosure () -> String) {
+        guard debugEnabled else { return }
+        print(String(format: "[%5.1fs] ", Date().timeIntervalSince(debugStart)) + message())
+        fflush(stdout)
+    }
 
     static func idleSeconds() -> TimeInterval {
         guard let anyInput = CGEventType(rawValue: ~0) else { return 0 }

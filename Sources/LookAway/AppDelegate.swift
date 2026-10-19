@@ -5,7 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let scheduler = BreakScheduler()
     private let reminder = ReminderPanelController()
     private let overlay = BreakOverlayController()
-    private let posture = PostureToastController()
+    private let nudges = NudgeToastController()
 
     private var statusItem: NSStatusItem!
     private let statusLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -33,15 +33,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         overlay.onSkip = { [weak self] in self?.scheduler.skipBreak() }
         overlay.onAdjustingChange = { [weak self] held in self?.scheduler.holdBreak(held) }
         overlay.onDurationApply = { [weak self] s in self?.scheduler.setBreakDuration(TimeInterval(s)) }
-        overlay.onDrankWater = { [weak self] in self?.logWater() ?? WaterLog.today }
+        nudges.onLogWater = { [weak self] in self?.logWater() ?? WaterLog.today }
 
-        scheduler.onPostureDue = { [weak self] in self?.posture.show() }
+        scheduler.onNudgeDue = { [weak self] kind in self?.nudges.show(kind) }
         scheduler.callCheck = { CallDetector.isInCall() }
 
         scheduler.onPhaseChange = { [weak self] old, new in
             guard let self else { return }
             if new != .warning { reminder.hide() }
-            if new != .working { posture.hide() }   // the eye reminder takes the same spot
+            if new != .working { nudges.hideAll() }   // the eye reminder takes the same spot
             if old == .onBreak {
                 overlay.hide()
                 NSSound(named: "Glass")?.play()
@@ -55,14 +55,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 reminder.show(
                     remaining: scheduler.remaining,
                     total: scheduler.config.warningLead,
-                    breakDuration: scheduler.config.breakDuration,
-                    water: scheduler.waterDue
+                    breakDuration: scheduler.config.breakDuration
                 )
             case .onBreak:
-                overlay.show(breakDuration: Int(scheduler.config.breakDuration), water: scheduler.isWaterBreak)
+                overlay.show(breakDuration: Int(scheduler.config.breakDuration))
                 overlay.update(remaining: scheduler.breakRemaining, total: scheduler.config.breakDuration)
             case .working:
-                if scheduler.inCall { posture.hide() }
+                if scheduler.inCall { nudges.hideAll() }
             }
             refreshStatusItem()
         }
@@ -96,7 +95,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func setUpStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            button.imagePosition = .imageLeading
             button.font = .monospacedDigitSystemFont(ofSize: 13, weight: .medium)
         }
         let menu = NSMenu()
@@ -104,38 +102,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = menu
     }
 
+    /// Text only: the time left, or a word for the current state.
     private func refreshStatusItem() {
         guard let button = statusItem?.button else { return }
-        let symbol: String
         let title: String
 
         if scheduler.isPaused {
-            symbol = "eye.slash"
-            title = ""
+            title = "Paused"
         } else {
             switch scheduler.phase {
             case .onBreak:
-                symbol = "eyes"
-                title = " \(Int(scheduler.breakRemaining.rounded(.up)))s"
+                title = "\(Int(scheduler.breakRemaining.rounded(.up)))s"
             case .warning:
-                symbol = "eyes"
-                title = " " + formatClock(scheduler.remaining)
+                title = formatClock(scheduler.remaining)
             case .working where scheduler.inCall:
-                symbol = "phone.fill"
-                let r = scheduler.remaining
-                title = r <= 0 ? " later" : r >= 60 ? " \(Int((r / 60).rounded(.up)))m" : " \(Int(r.rounded(.up)))s"
+                title = "In call"
             case .working:
-                // A water break went by without a logged glass: the eyes become a drop until logged.
-                symbol = scheduler.waterPending ? "drop.fill" : "eyes"
                 let r = scheduler.remaining
-                title = r >= 60 ? " \(Int((r / 60).rounded(.up)))m" : " \(Int(r.rounded(.up)))s"
+                title = r >= 60 ? "\(Int((r / 60).rounded(.up)))m" : "\(Int(r.rounded(.up)))s"
             }
         }
 
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Look Away")
-        image?.isTemplate = true
-        button.image = image
+        button.image = nil
         button.title = title
+        button.setAccessibilityLabel("Look Away: \(statusDescription())")
         statusLine.title = statusDescription()
     }
 
@@ -149,7 +139,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .warning: return "Break starting…"
         case .working:
             if scheduler.inCall { return "In a call. Breaks will wait." }
-            if scheduler.waterPending { return "Time for some water" }
             let r = scheduler.remaining
             return r >= 60
                 ? "Next break in \(Int((r / 60).rounded(.up))) min"
@@ -170,7 +159,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if scheduler.config.waterEnabled {
             let waterCount = NSMenuItem(title: "Water today: \(WaterLog.today) / \(WaterLog.dailyGoal) glasses",
                                         action: nil, keyEquivalent: "")
-            waterCount.image = NSImage(systemSymbolName: "drop.fill", accessibilityDescription: nil)
             waterCount.isEnabled = false
             menu.addItem(waterCount)
             menu.addItem(item("I Drank Water", #selector(drankWaterFromMenu), key: "w"))
@@ -211,7 +199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return seconds(scheduler.config.breakDuration)
         })
         if scheduler.config.waterEnabled {
-            menu.addItem(.stepper(title: "Water break", value: minutes(scheduler.config.waterInterval)) { [weak self] dir in
+            menu.addItem(.stepper(title: "Water", value: minutes(scheduler.config.waterInterval)) { [weak self] dir in
                 guard let self else { return "" }
                 scheduler.setWaterInterval(Self.snap(scheduler.config.waterInterval, step: 15 * 60, dir: dir))
                 return minutes(scheduler.config.waterInterval)
@@ -276,11 +264,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         scheduler.setHoldDuringCalls(!scheduler.config.holdDuringCalls)
     }
 
-    @objc private func toggleWater() { scheduler.setWaterEnabled(!scheduler.config.waterEnabled) }
+    @objc private func toggleWater() {
+        scheduler.setWaterEnabled(!scheduler.config.waterEnabled)
+        if !scheduler.config.waterEnabled { nudges.hide(.water) }
+    }
 
     @objc private func togglePosture() {
         scheduler.setPostureEnabled(!scheduler.config.postureEnabled)
-        if !scheduler.config.postureEnabled { posture.hide() }
+        if !scheduler.config.postureEnabled { nudges.hide(.posture) }
     }
 
     @objc private func takeBreakNow() { scheduler.startBreak(manual: true) }
