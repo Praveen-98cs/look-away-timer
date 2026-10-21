@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Healthy Pops – Free Eye Break, Water &amp; Posture Reminders for Mac</title>
+<title>Healthy Pops – Eye Break, Water, Posture &amp; Custom Reminders for Mac</title>
 <meta name="description" content="Healthy Pops is a free, open-source Mac menu bar app with gentle popups for the 20-20-20 eye rule, drinking water, posture and your own custom reminders. Quiet during calls. No account, no tracking.">
-<meta name="keywords" content="20-20-20 rule app, eye strain Mac, eye break reminder, screen break app macOS, digital eye strain, posture reminder Mac, water reminder Mac, healthy pops, developer health app, custom reminders Mac, LookAway alternative, free break timer">
+<meta name="keywords" content="20-20-20 rule app, eye strain Mac, eye break reminder, screen break app macOS, digital eye strain, posture reminder Mac, water reminder Mac, healthy pops, developer health app, custom reminders Mac, custom reminder popups, stretch reminder Mac, eye drops reminder, LookAway alternative, free break timer">
 <link rel="canonical" href="https://healthy-pops.pages.dev/">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#0b0a24">
@@ -16,7 +16,7 @@
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Healthy Pops">
-<meta property="og:title" content="Healthy Pops – Free Eye Break, Water &amp; Posture Reminders for Mac">
+<meta property="og:title" content="Healthy Pops – Eye Break, Water, Posture &amp; Custom Reminders for Mac">
 <meta property="og:description" content="Tiny popups that keep developers healthy: 20-20-20 eye breaks, water, posture and custom reminders. Quiet during calls. Free and open source.">
 <meta property="og:url" content="https://healthy-pops.pages.dev/">
 <meta property="og:image" content="https://healthy-pops.pages.dev/og.jpg">
@@ -24,7 +24,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Healthy Pops reminder below the Mac menu bar">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Healthy Pops – Free Eye Break, Water &amp; Posture Reminders for Mac">
+<meta name="twitter:title" content="Healthy Pops – Eye Break, Water, Posture &amp; Custom Reminders for Mac">
 <meta name="twitter:description" content="Tiny popups that keep developers healthy: eye breaks, water, posture and custom reminders. Free and open source.">
 <meta name="twitter:image" content="https://healthy-pops.pages.dev/og.jpg">
 
@@ -221,17 +221,52 @@
   .dial .num { font-size: 58px; font-weight: 700; }
   .dial .unit { font-size: 14px; fill: rgba(255,255,255,.55); font-weight: 500; }
 
-  .toast { position: relative; display: flex; align-items: center; gap: 14px; padding: 14px 22px 16px 16px; width: fit-content; max-width: 100%;
+  .toast { --c1: var(--mint); --c2: var(--teal); position: relative; display: flex; align-items: center; gap: 14px; padding: 14px 22px 16px 16px; width: fit-content; max-width: 100%;
            border-radius: 22px; border: 1px solid rgba(255,255,255,.14); background: linear-gradient(180deg, rgba(36,35,52,.92), rgba(26,25,40,.95));
            box-shadow: 0 24px 70px rgba(0,0,0,.5); overflow: hidden; }
   .toast-badge { width: 44px; height: 44px; flex: none; border-radius: 50%; display: grid; place-items: center;
-                 background: radial-gradient(circle at 25% 20%, rgba(255,255,255,.3), transparent 60%), linear-gradient(45deg, var(--mint), var(--teal));
-                 box-shadow: 0 4px 14px rgba(31,162,196,.45); }
+                 background: radial-gradient(circle at 25% 20%, rgba(255,255,255,.3), transparent 60%), linear-gradient(45deg, var(--c1), var(--c2));
+                 box-shadow: 0 4px 14px rgba(0,0,0,.35); font-size: 20px; }
   .toast-title { font-weight: 700; font-size: 17px; }
   .toast-msg { color: var(--muted); font-size: 14px; }
   .toast-bar { position: absolute; left: 22px; right: 22px; bottom: 6px; height: 2px; }
-  .toast-bar span { display: block; height: 100%; border-radius: 2px; background: rgba(79,227,181,.7); animation: toastbar 5s linear infinite; }
+  .toast-bar span { display: block; height: 100%; border-radius: 2px; background: var(--c1); opacity: .75; animation: toastbar 5s linear infinite; }
   @keyframes toastbar { from { width: 100%; } to { width: 0; } }
+
+
+  /* Custom popups showcase */
+  .custom-grid { display: grid; grid-template-columns: 6fr 5fr; gap: 56px; align-items: center; }
+  .editor-mock { border-radius: 24px; padding: 26px; border: 1px solid rgba(255,255,255,.12);
+                 background: linear-gradient(180deg, rgba(40,38,58,.92), rgba(28,27,42,.95)); box-shadow: 0 40px 100px rgba(0,0,0,.5); }
+  .ed-title { text-align: center; font-weight: 650; font-size: 19px; margin-bottom: 18px; color: rgba(255,255,255,.9); }
+  .ed-row { display: flex; align-items: center; gap: 14px; min-height: 46px; padding: 0 14px; margin-bottom: 8px; border-radius: 12px;
+            background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.08); }
+  .ed-row.active { border: 1.5px solid transparent;
+                   background: linear-gradient(#302e42, #302e42) padding-box, var(--grad) border-box; }
+  .ed-label { width: 56px; flex: none; font-size: 12px; color: var(--faint); font-weight: 500; }
+  .ed-value { font-weight: 600; }
+  .ed-value.muted { font-weight: 400; color: rgba(255,255,255,.75); font-size: 15px; }
+  .caret { display: inline-block; width: 2px; height: 1.05em; background: #fff; margin-left: 2px; vertical-align: -3px; animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .ed-icons { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ed-icons span { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; background: rgba(255,255,255,.06); }
+  .ed-icons span.on { background: linear-gradient(45deg, #6a4cf0, #b18cff); box-shadow: 0 0 0 2px rgba(255,255,255,.08); }
+  .ed-swatches { display: flex; gap: 10px; }
+  .ed-swatches span { width: 20px; height: 20px; border-radius: 50%; }
+  .ed-swatches span.on { box-shadow: 0 0 0 2px #2b2a3a, 0 0 0 4px rgba(255,255,255,.9); }
+  .ed-step { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ed-step i { font-style: normal; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.12); font-size: 14px; }
+  .ed-step small { color: var(--faint); font-weight: 400; font-size: 13px; }
+  .ed-actions { display: flex; justify-content: center; gap: 10px; margin-top: 18px; }
+  .toast-stack { display: flex; flex-direction: column; gap: 18px; }
+  .toast-stack .toast { animation: float 6s ease-in-out infinite; }
+  .toast-stack .toast:nth-child(2) { margin-left: 44px; animation-delay: -2s; }
+  .toast-stack .toast:nth-child(3) { margin-left: 14px; animation-delay: -4s; }
+  @keyframes float { 50% { transform: translateY(-6px); } }
+  .perks { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; list-style: none; padding: 0; margin: 48px 0 0; }
+  .perks li { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--glass); color: var(--muted); font-size: 15px; }
+  a.eyebrow { text-decoration: none; transition: border-color .2s, background .2s; }
+  a.eyebrow:hover { border-color: rgba(255,255,255,.25); background: rgba(255,255,255,.08); }
 
   /* Feature grid */
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
@@ -266,11 +301,16 @@
   .js .reveal.in { opacity: 1; transform: none; }
 
   @media (max-width: 900px) {
+    .custom-grid { grid-template-columns: 1fr; gap: 36px; }
+    .toast-stack .toast:nth-child(n) { margin-left: 0; }
     .step, .step.flip { grid-template-columns: 1fr; gap: 32px; margin-bottom: 80px; }
     .step.flip .copy { order: 0; }
     .grid { grid-template-columns: 1fr 1fr; }
   }
   @media (max-width: 640px) {
+    .editor-mock { padding: 18px; }
+    .ed-icons span:nth-child(n+7) { display: none; }
+    .ed-step small { display: none; }
     nav a:not(.nav-cta) { display: none; }
     .grid, .rule { grid-template-columns: 1fr; }
     .menubar .left span, .menubar .right .opt { display: none; }
@@ -290,6 +330,7 @@
     <a class="brand" href="/"><img src="favicon.svg" alt="" width="26" height="26">Healthy Pops</a>
     <nav aria-label="Main">
       <a href="#how">How it works</a>
+      <a href="#custom">Custom popups</a>
       <a href="#features">Features</a>
       <a href="#faq">FAQ</a>
       <a href="https://github.com/ThusharaSampath/healthy-pops">GitHub</a>
@@ -300,7 +341,7 @@
 
 <main>
   <div class="wrap hero">
-    <div class="eyebrow">🍎 <b>Free</b> for macOS · open source</div>
+    <a class="eyebrow" href="#custom">✨ <b>New</b> Make your own health popups →</a>
     <h1>Stay healthy at your desk.<br><span class="grad-text">Without thinking about it.</span></h1>
     <p class="lead">Healthy Pops is a tiny Mac menu bar app with gentle popups that follow the <strong>20-20-20 eye rule</strong> for you, nudge you to drink water and sit up straight, and remind you of anything else you like. It stays quiet during calls.</p>
     <div class="actions">
@@ -310,7 +351,7 @@
       </a>
       <a class="ghost" href="#how">See how it works</a>
     </div>
-    <p class="meta">Version <span data-version>1.2.1</span> · macOS 13+ · Apple Silicon &amp; Intel · under 1 MB</p>
+    <p class="meta">Free &amp; open source · Version <span data-version>1.2.1</span> · macOS 13+ · Apple Silicon &amp; Intel · under 1 MB</p>
 
     <div class="desk" role="img" aria-label="The Healthy Pops reminder dropping in below the Mac menu bar: get ready to look away for 20 seconds">
       <div class="menubar">
@@ -447,6 +488,65 @@
           </div>
         </div>
       </div>
+    </div>
+  </section>
+
+
+  <section id="custom" aria-labelledby="custom-h">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="kicker grad-text">Custom popups</div>
+        <h2 id="custom-h">Your health. Your popups.</h2>
+        <p class="sub">Eye drops at three? Wrist stretches every 45 minutes? A nudge to breathe before your next standup? Make your own popup in seconds, without touching the mouse.</p>
+      </div>
+      <div class="custom-grid reveal">
+        <div class="editor-mock" role="img" aria-label="Healthy Pops custom popup editor: title Stretch your wrists, an icon picker, colour swatches and an interval of every 45 minutes of screen time">
+          <div class="ed-title">New custom popup</div>
+          <div class="ed-row"><span class="ed-label">Title</span><span class="ed-value">Stretch your wrists<span class="caret"></span></span></div>
+          <div class="ed-row"><span class="ed-label">Message</span><span class="ed-value muted">Ten slow circles each way.</span></div>
+          <div class="ed-row active"><span class="ed-label">Icon</span>
+            <span class="ed-icons"><span>🔔</span><span>💚</span><span>🌿</span><span class="on">🤲</span><span>☀️</span><span>🫁</span><span>🚶</span><span>☕</span><span>💊</span></span></div>
+          <div class="ed-row"><span class="ed-label">Colour</span>
+            <span class="ed-swatches">
+              <span style="background:linear-gradient(45deg,#ff4fa3,#ee8b5f)"></span>
+              <span style="background:linear-gradient(45deg,#4fe3b5,#1fa2c4)"></span>
+              <span style="background:linear-gradient(45deg,#5ac8fa,#3d7bf5)"></span>
+              <span class="on" style="background:linear-gradient(45deg,#6a4cf0,#b18cff)"></span>
+              <span style="background:linear-gradient(45deg,#ffd25a,#ff8a3d)"></span>
+              <span style="background:linear-gradient(45deg,#9be15d,#2fb67c)"></span>
+            </span></div>
+          <div class="ed-row"><span class="ed-label">Every</span><span class="ed-step"><i>−</i>45 min<i>+</i><small>of screen time</small></span></div>
+          <div class="ed-actions">
+            <span class="chip">Cancel <kbd>esc</kbd></span>
+            <span class="chip primary">Add popup <kbd>↩</kbd></span>
+          </div>
+        </div>
+
+        <div class="toast-stack" role="img" aria-label="Example custom popups: Stretch your wrists, Eye drops time, Take three deep breaths">
+          <div class="toast" style="--c1:#b18cff;--c2:#6a4cf0">
+            <div class="toast-badge">🤲</div>
+            <div><div class="toast-title">Stretch your wrists</div><div class="toast-msg">Ten slow circles each way.</div></div>
+            <div class="toast-bar"><span></span></div>
+          </div>
+          <div class="toast" style="--c1:#5ac8fa;--c2:#3d7bf5">
+            <div class="toast-badge">💧</div>
+            <div><div class="toast-title">Eye drops time</div><div class="toast-msg">Your 3 pm dose. Blink it in.</div></div>
+            <div class="toast-bar"><span></span></div>
+          </div>
+          <div class="toast" style="--c1:#9be15d;--c2:#2fb67c">
+            <div class="toast-badge">🫁</div>
+            <div><div class="toast-title">Take three deep breaths</div><div class="toast-msg">In for four, hold, out for six.</div></div>
+            <div class="toast-bar"><span></span></div>
+          </div>
+        </div>
+      </div>
+      <ul class="perks reveal" aria-label="Custom popup features">
+        <li>⌨️ Keyboard first: Tab, arrows, Return</li>
+        <li>🎨 16 icons, 6 colours</li>
+        <li>⏱️ Every 5 min to 4 h of screen time</li>
+        <li>📞 Quiet during calls, like everything else</li>
+        <li>🔁 Switch each one on or off from the menu</li>
+      </ul>
     </div>
   </section>
 
