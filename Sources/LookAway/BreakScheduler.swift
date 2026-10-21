@@ -29,6 +29,8 @@ final class BreakScheduler {
         var waterEnabled = true
         var postureEnabled = true
         var holdDuringCalls = true
+        /// Length of a "minute" for custom popup intervals (shortened in debug runs).
+        var customMinute: TimeInterval = 60
 
         static let breakDurationKey = "breakDuration"
         static let workIntervalKey = "workInterval"
@@ -66,6 +68,7 @@ final class BreakScheduler {
             config.waterEnabled = defaults.object(forKey: waterEnabledKey) as? Bool ?? true
             config.postureEnabled = defaults.object(forKey: postureEnabledKey) as? Bool ?? true
             config.holdDuringCalls = defaults.object(forKey: holdDuringCallsKey) as? Bool ?? true
+            if debug { config.customMinute = 3 }
             return config
         }
     }
@@ -88,6 +91,11 @@ final class BreakScheduler {
 
     private(set) var waterWorked: TimeInterval = 0
     private(set) var postureWorked: TimeInterval = 0
+    private var customWorked: [UUID: TimeInterval] = [:]
+    /// Source of custom popups to schedule.
+    var customPopups: () -> [CustomPopup] = { [] }
+    /// Set while the app's own full-screen UI (e.g. the popup editor) is open: keep counting, show nothing.
+    var uiHold = false
     private var suspendedAt: Date?
 
     /// Called when a water or posture nudge is due; only fires while no break UI is up.
@@ -208,6 +216,11 @@ final class BreakScheduler {
         onTick?()
     }
 
+    /// Start a custom popup's timer over (after it was created or edited).
+    func resetCustom(id: UUID) {
+        customWorked[id] = 0
+    }
+
     private func resetWater() {
         waterWorked = 0
     }
@@ -256,6 +269,7 @@ final class BreakScheduler {
         }
         suspendedAt = nil
         postureWorked = 0
+        customWorked.removeAll()
         lastTick = Date()
         resetCycle()
     }
@@ -284,14 +298,15 @@ final class BreakScheduler {
             return
         }
 
-        let held = config.holdDuringCalls && (callCheck?() ?? false)
-        if held != inCall {
-            inCall = held
+        let callHeld = config.holdDuringCalls && (callCheck?() ?? false)
+        if callHeld != inCall {
+            inCall = callHeld
             // Call ended: give a moment to hang up before an overdue break shows.
-            if !held, phase == .working, remaining < afterCallGrace {
+            if !callHeld, phase == .working, remaining < afterCallGrace {
                 target = worked + afterCallGrace
             }
         }
+        let held = callHeld || uiHold
 
         switch phase {
         case .onBreak:
@@ -317,11 +332,14 @@ final class BreakScheduler {
                 }
                 if idle >= config.waterAwayReset { resetWater() }
                 postureWorked = 0
+                customWorked.removeAll()
                 return
             }
             worked += dt
             if config.waterEnabled { waterWorked += dt }
             if config.postureEnabled { postureWorked += dt }
+            let custom = customPopups().filter(\.enabled)
+            for popup in custom { customWorked[popup.id, default: 0] += dt }
             if held {
                 // Keep counting, but show nothing until the call is over.
                 if phase == .warning { phase = .working }
@@ -342,6 +360,12 @@ final class BreakScheduler {
                     postureWorked = 0
                     Self.debugLog("nudge posture")
                     onNudgeDue?(.posture)
+                }
+                for popup in custom where customWorked[popup.id, default: 0]
+                    >= TimeInterval(popup.intervalMinutes) * config.customMinute {
+                    customWorked[popup.id] = 0
+                    Self.debugLog("nudge custom \(popup.title)")
+                    onNudgeDue?(.custom(popup))
                 }
             }
         }

@@ -3,14 +3,25 @@ import Carbon.HIToolbox
 import SwiftUI
 
 /// The small reminders that drop in below the menu bar and fade on their own.
-enum NudgeKind {
+enum NudgeKind: Equatable {
     case posture
     case water
+    case custom(CustomPopup)
+
+    /// Stable identity for queueing and message rotation (a custom popup keeps its id when edited).
+    var key: String {
+        switch self {
+        case .posture: return "posture"
+        case .water: return "water"
+        case .custom(let p): return p.id.uuidString
+        }
+    }
 
     var title: String {
         switch self {
         case .posture: return "Straighten your back"
         case .water: return "Time for some water"
+        case .custom(let p): return p.title
         }
     }
 
@@ -18,6 +29,7 @@ enum NudgeKind {
         switch self {
         case .posture: return "figure.stand"
         case .water: return "drop.fill"
+        case .custom(let p): return p.symbol
         }
     }
 
@@ -25,6 +37,7 @@ enum NudgeKind {
         switch self {
         case .posture: return [Palette.mint, Palette.teal]
         case .water: return [Palette.water, Color(hex: 0x3D7BF5)]
+        case .custom(let p): return p.colors
         }
     }
 
@@ -33,6 +46,7 @@ enum NudgeKind {
         switch self {
         case .posture: return 5
         case .water: return 8
+        case .custom: return 6
         }
     }
 
@@ -62,6 +76,7 @@ enum NudgeKind {
             "Even your code needs a flush sometimes. Go get water. 🚰",
             "Achievement unlocked: stand up, find water. 🏆",
         ]
+        case .custom(let p): return [p.message]
         }
     }
 }
@@ -99,10 +114,13 @@ struct NudgeView: View {
                 Text(model.kind.title)
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(.white)
-                Text(model.loggedNote ?? model.message)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.72))
                     .fixedSize()
+                if let line = model.loggedNote ?? (model.message.isEmpty ? nil : model.message) {
+                    Text(line)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .fixedSize()
+                }
             }
 
             if model.kind == .water, model.loggedNote == nil {
@@ -148,7 +166,7 @@ struct NudgeView: View {
     }
 }
 
-/// Shows posture and water nudges one at a time below the menu bar. No focus is taken;
+/// Shows posture, water and custom nudges one at a time below the menu bar. No focus is taken;
 /// each fades out on its own, or straight away when clicked. A nudge that arrives while
 /// another is visible waits its turn.
 final class NudgeToastController {
@@ -160,11 +178,11 @@ final class NudgeToastController {
     private var dismissWork: DispatchWorkItem?
     private var queue: [NudgeKind] = []
     private let hotKeys = HotKeys()
-    private var lastMessage: [NudgeKind: String] = [:]
+    private var lastMessage: [String: String] = [:]
 
     func show(_ kind: NudgeKind) {
         if panel != nil {
-            if model.kind != kind, !queue.contains(kind) { queue.append(kind) }
+            if model.kind.key != kind.key, !queue.contains(where: { $0.key == kind.key }) { queue.append(kind) }
             return
         }
         present(kind)
@@ -177,13 +195,20 @@ final class NudgeToastController {
     }
 
     func hide(_ kind: NudgeKind) {
-        queue.removeAll { $0 == kind }
-        if panel != nil, model.kind == kind { hide(animated: true, next: true) }
+        queue.removeAll { $0.key == kind.key }
+        if panel != nil, model.kind.key == kind.key { hide(animated: true, next: true) }
+    }
+
+    /// Drops a deleted or disabled custom popup.
+    func hideCustom(id: UUID) {
+        queue.removeAll { $0.key == id.uuidString }
+        if panel != nil, model.kind.key == id.uuidString { hide(animated: true, next: true) }
     }
 
     private func present(_ kind: NudgeKind) {
-        let message = kind.messages.filter { $0 != lastMessage[kind] }.randomElement() ?? ""
-        lastMessage[kind] = message
+        let message = kind.messages.filter { $0 != lastMessage[kind.key] }.randomElement()
+            ?? kind.messages.first ?? ""
+        lastMessage[kind.key] = message
         model.kind = kind
         model.message = message
         model.loggedNote = nil

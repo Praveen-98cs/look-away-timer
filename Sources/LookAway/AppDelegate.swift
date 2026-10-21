@@ -6,6 +6,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let reminder = ReminderPanelController()
     private let overlay = BreakOverlayController()
     private let nudges = NudgeToastController()
+    private let editor = PopupEditorController()
+    private let customStore = CustomPopupStore.shared
 
     private var statusItem: NSStatusItem!
     private let statusLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -36,6 +38,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         nudges.onLogWater = { [weak self] in self?.logWater() ?? WaterLog.today }
 
         scheduler.onNudgeDue = { [weak self] kind in self?.nudges.show(kind) }
+        scheduler.customPopups = { CustomPopupStore.shared.popups }
+
+        editor.onSave = { [weak self] popup in
+            guard let self else { return }
+            customStore.upsert(popup)
+            scheduler.resetCustom(id: popup.id)
+            // Show it once so the user sees exactly what they made.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.nudges.show(.custom(popup)) }
+        }
+        editor.onClose = { [weak self] in self?.scheduler.uiHold = false }
         scheduler.callCheck = { CallDetector.isInCall() }
 
         scheduler.onPhaseChange = { [weak self] old, new in
@@ -183,6 +195,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let callToggle = item("Hold Breaks During Calls", #selector(toggleHoldDuringCalls), key: "")
         callToggle.state = scheduler.config.holdDuringCalls ? .on : .off
         menu.addItem(callToggle)
+        let custom = NSMenuItem(title: "Custom Popups", action: nil, keyEquivalent: "")
+        custom.submenu = customPopupsMenu()
+        menu.addItem(custom)
         menu.addItem(.separator())
 
         let timersHeader = NSMenuItem(title: "Timers", action: nil, keyEquivalent: "")
@@ -260,6 +275,77 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func drankWaterFromMenu() { logWater() }
+    // MARK: - Custom popups
+
+    private func customPopupsMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.addItem(item("New Popup…", #selector(newCustomPopup), key: "n"))
+        let popups = customStore.popups
+        if !popups.isEmpty { menu.addItem(.separator()) }
+        for popup in popups {
+            let row = NSMenuItem(title: "\(popup.title)  ·  \(popup.intervalLabel)", action: nil, keyEquivalent: "")
+            row.image = NSImage(systemSymbolName: popup.symbol, accessibilityDescription: nil)
+            if !popup.enabled {
+                row.attributedTitle = NSAttributedString(
+                    string: "\(popup.title)  ·  off",
+                    attributes: [.foregroundColor: NSColor.secondaryLabelColor])
+            }
+            let sub = NSMenu()
+            let enabled = customItem("Enabled", #selector(toggleCustomPopup(_:)), popup)
+            enabled.state = popup.enabled ? .on : .off
+            sub.addItem(enabled)
+            sub.addItem(customItem("Edit…", #selector(editCustomPopup(_:)), popup))
+            sub.addItem(customItem("Show Now", #selector(previewCustomPopup(_:)), popup))
+            sub.addItem(.separator())
+            sub.addItem(customItem("Delete", #selector(deleteCustomPopup(_:)), popup))
+            row.submenu = sub
+            menu.addItem(row)
+        }
+        return menu
+    }
+
+    private func customItem(_ title: String, _ action: Selector, _ popup: CustomPopup) -> NSMenuItem {
+        let i = item(title, action, key: "")
+        i.representedObject = popup.id
+        return i
+    }
+
+    private func customPopup(from sender: NSMenuItem) -> CustomPopup? {
+        (sender.representedObject as? UUID).flatMap(customStore.popup(id:))
+    }
+
+    private func openEditor(_ popup: CustomPopup?) {
+        scheduler.uiHold = true
+        nudges.hideAll()
+        editor.open(editing: popup)
+    }
+
+    @objc private func newCustomPopup() { openEditor(nil) }
+
+    @objc private func editCustomPopup(_ sender: NSMenuItem) {
+        guard let popup = customPopup(from: sender) else { return }
+        openEditor(popup)
+    }
+
+    @objc private func previewCustomPopup(_ sender: NSMenuItem) {
+        guard let popup = customPopup(from: sender) else { return }
+        nudges.show(.custom(popup))
+    }
+
+    @objc private func toggleCustomPopup(_ sender: NSMenuItem) {
+        guard var popup = customPopup(from: sender) else { return }
+        popup.enabled.toggle()
+        customStore.upsert(popup)
+        scheduler.resetCustom(id: popup.id)
+        if !popup.enabled { nudges.hideCustom(id: popup.id) }
+    }
+
+    @objc private func deleteCustomPopup(_ sender: NSMenuItem) {
+        guard let popup = customPopup(from: sender) else { return }
+        customStore.remove(id: popup.id)
+        nudges.hideCustom(id: popup.id)
+    }
+
     @objc private func toggleHoldDuringCalls() {
         scheduler.setHoldDuringCalls(!scheduler.config.holdDuringCalls)
     }
