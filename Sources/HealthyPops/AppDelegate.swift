@@ -137,7 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         button.image = nil
         button.title = title
-        button.setAccessibilityLabel("Look Away: \(statusDescription())")
+        button.setAccessibilityLabel("Healthy Pops: \(statusDescription())")
         statusLine.title = statusDescription()
     }
 
@@ -248,7 +248,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let login = item("Launch at Login", #selector(toggleLaunchAtLogin), key: "")
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(login)
-        menu.addItem(item("Quit Look Away", #selector(quit), key: "q"))
+        menu.addItem(item("Quit Healthy Pops", #selector(quit), key: "q"))
     }
 
     /// Next multiple of `step` in direction `dir`, so odd values (e.g. 9 s from the dial) land on the grid.
@@ -385,7 +385,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } catch {
             let alert = NSAlert()
             alert.messageText = "Couldn't change Launch at Login"
-            alert.informativeText = "\(error.localizedDescription)\n\nMove Look Away.app to /Applications and try again."
+            alert.informativeText = "\(error.localizedDescription)\n\nMove Healthy Pops.app to /Applications and try again."
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
         }

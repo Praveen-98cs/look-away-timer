@@ -27,22 +27,22 @@ jobs:
             VERSION="0.0.0-dev.${GITHUB_RUN_NUMBER}"
           fi
           ./make-dmg.sh "$VERSION"
-          lipo -info "build/Look Away.app/Contents/MacOS/LookAway"
-          # Unversioned copy so releases/latest/download/LookAway.dmg always works.
-          cp "build/LookAway-${VERSION}.dmg" build/LookAway.dmg
+          lipo -info "build/Healthy Pops.app/Contents/MacOS/HealthyPops"
+          # Unversioned copy so releases/latest/download/HealthyPops.dmg always works.
+          cp "build/HealthyPops-${VERSION}.dmg" build/HealthyPops.dmg
 
       - uses: actions/upload-artifact@v4
         with:
-          name: LookAway-dmg
-          path: build/LookAway-*.dmg
+          name: HealthyPops-dmg
+          path: build/HealthyPops-*.dmg
 
       - name: Publish release
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" build/LookAway-*.dmg build/LookAway.dmg \
-            --title "Look Away $GITHUB_REF_NAME" \
+          gh release create "$GITHUB_REF_NAME" build/HealthyPops-*.dmg build/HealthyPops.dmg \
+            --title "Healthy Pops $GITHUB_REF_NAME" \
             --generate-notes
 
   deploy-site:
@@ -69,5 +69,5 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # First run creates the project; later runs just skip this.
-          preCommands: wrangler pages project create look-away --production-branch=main || true
-          command: pages deploy site --project-name=look-away --branch=main
+          preCommands: wrangler pages project create healthy-pops --production-branch=main || true
+          command: pages deploy site --project-name=healthy-pops --branch=main

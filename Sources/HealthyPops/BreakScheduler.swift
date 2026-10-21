@@ -46,8 +46,8 @@ final class BreakScheduler {
 
         static var standard: Config {
             let defaults = UserDefaults.standard
-            // LOOKAWAY_DEBUG=1 shortens everything so the flow can be checked quickly.
-            let debug = ProcessInfo.processInfo.environment["LOOKAWAY_DEBUG"] != nil
+            // HEALTHYPOPS_DEBUG=1 shortens everything so the flow can be checked quickly.
+            let debug = ProcessInfo.processInfo.environment["HEALTHYPOPS_DEBUG"] != nil
             var config = debug
                 ? Config(workInterval: 30, breakDuration: 20, warningLead: 5, idleReset: 45,
                          waterInterval: 50, waterAwayReset: 90, postureInterval: 15)
@@ -374,9 +374,9 @@ final class BreakScheduler {
     // MARK: - System state helpers
 
     private static let debugStart = Date()
-    private static let debugEnabled = ProcessInfo.processInfo.environment["LOOKAWAY_DEBUG"] != nil
+    private static let debugEnabled = ProcessInfo.processInfo.environment["HEALTHYPOPS_DEBUG"] != nil
 
-    /// Timeline log for LOOKAWAY_DEBUG runs; silent otherwise.
+    /// Timeline log for HEALTHYPOPS_DEBUG runs; silent otherwise.
     static func debugLog(_ message: @autoclosure () -> String) {
         guard debugEnabled else { return }
         print(String(format: "[%5.1fs] ", Date().timeIntervalSince(debugStart)) + message())
