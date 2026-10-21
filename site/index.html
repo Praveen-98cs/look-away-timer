@@ -105,7 +105,8 @@
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; text-decoration: none; letter-spacing: -.01em; }
   .brand img { width: 26px; height: 26px; }
   nav { display: flex; align-items: center; gap: 26px; font-size: 15px; }
-  nav a { color: var(--muted); text-decoration: none; }
+  nav a { color: var(--muted); text-decoration: none; white-space: nowrap; }
+  @media (max-width: 860px) { nav a.nav-extra { display: none; } }
   nav a:hover { color: var(--text); }
   .nav-cta { padding: 7px 16px; border-radius: 999px; background: rgba(255,255,255,.1); color: var(--text) !important; }
 
@@ -244,15 +245,17 @@
               opacity: 0; transform: translate(-50%, -14px) scale(.98); pointer-events: none;
               transition: opacity .35s ease, transform .45s cubic-bezier(.2,.9,.3,1.2); }
   .live-pop.show { opacity: 1; transform: translate(-50%, 0) scale(1); pointer-events: auto; }
-  .live-pop .toast { cursor: pointer; padding-right: 44px;
+  .live-pop .toast { cursor: pointer; padding-right: 78px;
                      background: linear-gradient(180deg, rgba(36,35,52,.78), rgba(26,25,40,.85));
                      backdrop-filter: blur(22px) saturate(140%); -webkit-backdrop-filter: blur(22px) saturate(140%); }
   .live-pop .toast-msg a { color: var(--text); font-weight: 600; }
   .live-pop .toast-bar span { animation: none; width: 100%; }
   .live-pop.show .toast-bar span { animation: livebar var(--life, 7s) linear forwards; }
   @keyframes livebar { from { width: 100%; } to { width: 0; } }
-  .live-close { position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; border-radius: 50%; border: 0;
-                background: rgba(255,255,255,.08); color: rgba(255,255,255,.6); font-size: 15px; line-height: 1; cursor: pointer; }
+  .live-close { position: absolute; top: 9px; right: 10px; display: inline-flex; align-items: center; gap: 5px;
+                height: 22px; padding: 0 4px 0 8px; border-radius: 999px; border: 0; cursor: pointer;
+                background: rgba(255,255,255,.08); color: rgba(255,255,255,.6); font-size: 14px; line-height: 1; }
+  .live-close kbd { font-size: 10px; padding: 1px 5px; min-width: 0; }
   .live-close:hover { background: rgba(255,255,255,.16); color: #fff; }
   @media (max-width: 640px) { .live-pop { top: 72px; } .live-pop .toast-title { font-size: 15px; } }
 
@@ -377,9 +380,9 @@
   <div class="wrap nav">
     <a class="brand" href="/"><img src="favicon.svg" alt="" width="26" height="26">Healthy Pops</a>
     <nav aria-label="Main">
-      <a href="#builtin">Built-in</a>
+      <a class="nav-extra" href="#builtin">Built-in</a>
       <a href="#custom">Custom popups</a>
-      <a href="#open-source">Open source</a>
+      <a class="nav-extra" href="#open-source">Open source</a>
       <a href="#faq">FAQ</a>
       <a href="https://github.com/ThusharaSampath/healthy-pops">GitHub</a>
       <a class="nav-cta" href="https://github.com/ThusharaSampath/healthy-pops/releases/latest/download/HealthyPops.dmg">Download</a>
@@ -734,7 +737,7 @@ cd healthy-pops
   <div class="toast" id="live-toast">
     <div class="toast-badge" id="live-icon"></div>
     <div><div class="toast-title" id="live-title"></div><div class="toast-msg" id="live-msg"></div></div>
-    <button class="live-close" id="live-close" type="button" aria-label="Dismiss">×</button>
+    <button class="live-close" id="live-close" type="button" aria-label="Dismiss (Esc)"><span aria-hidden="true">×</span><kbd>Esc</kbd></button>
     <div class="toast-bar"><span></span></div>
   </div>
 </div>
