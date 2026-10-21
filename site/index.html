@@ -238,6 +238,24 @@
 
 
 
+
+  /* Live sample popup: the page demos the app by popping up like it would on your Mac */
+  .live-pop { position: fixed; top: 78px; left: 50%; z-index: 30; width: max-content; max-width: calc(100vw - 28px);
+              opacity: 0; transform: translate(-50%, -14px) scale(.98); pointer-events: none;
+              transition: opacity .35s ease, transform .45s cubic-bezier(.2,.9,.3,1.2); }
+  .live-pop.show { opacity: 1; transform: translate(-50%, 0) scale(1); pointer-events: auto; }
+  .live-pop .toast { cursor: pointer; padding-right: 44px;
+                     background: linear-gradient(180deg, rgba(36,35,52,.78), rgba(26,25,40,.85));
+                     backdrop-filter: blur(22px) saturate(140%); -webkit-backdrop-filter: blur(22px) saturate(140%); }
+  .live-pop .toast-msg a { color: var(--text); font-weight: 600; }
+  .live-pop .toast-bar span { animation: none; width: 100%; }
+  .live-pop.show .toast-bar span { animation: livebar var(--life, 7s) linear forwards; }
+  @keyframes livebar { from { width: 100%; } to { width: 0; } }
+  .live-close { position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; border-radius: 50%; border: 0;
+                background: rgba(255,255,255,.08); color: rgba(255,255,255,.6); font-size: 15px; line-height: 1; cursor: pointer; }
+  .live-close:hover { background: rgba(255,255,255,.16); color: #fff; }
+  @media (max-width: 640px) { .live-pop { top: 72px; } .live-pop .toast-title { font-size: 15px; } }
+
   /* Built-in popups */
   .bi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
   .bi-card { padding: 22px; border-radius: 22px; border: 1px solid var(--line); background: var(--glass); display: flex; flex-direction: column; }
@@ -711,6 +729,16 @@ cd healthy-pops
   </section>
 </main>
 
+
+<div class="live-pop" id="live-pop" role="status" aria-live="polite">
+  <div class="toast" id="live-toast">
+    <div class="toast-badge" id="live-icon"></div>
+    <div><div class="toast-title" id="live-title"></div><div class="toast-msg" id="live-msg"></div></div>
+    <button class="live-close" id="live-close" type="button" aria-label="Dismiss">×</button>
+    <div class="toast-bar"><span></span></div>
+  </div>
+</div>
+
 <footer>
   <div class="wrap">
     Healthy Pops <span data-version>1.2.1</span> · Free forever · <a href="https://github.com/ThusharaSampath/healthy-pops/blob/main/LICENSE">MIT licensed</a> · open source on <a href="https://github.com/ThusharaSampath/healthy-pops">GitHub</a> · PRs welcome ·
@@ -726,6 +754,62 @@ cd healthy-pops
     if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
   }), { threshold: 0.12 });
   document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // Sample popups: the page behaves like the app. A posture nudge first, then the rest
+  // in random order, each once, with quiet gaps. Click to dismiss; paused while the tab is hidden.
+  (() => {
+    const GH = 'https://github.com/ThusharaSampath/healthy-pops';
+    const first = { icon: '🧍', c: ['#4fe3b5', '#1fa2c4'], title: 'Straighten your back',
+                    msg: 'Sit up straight and enjoy the read. 😉' };
+    const rest = [
+      { icon: '💚', c: ['#9be15d', '#2fb67c'], title: 'Free forever',
+        msg: 'No subscription, no account, no catch. Ever.' },
+      { icon: '🍴', c: ['#b18cff', '#6a4cf0'], title: 'Fork it, make it yours',
+        msg: `Tweak every popup. <a href="${GH}/fork">Fork on GitHub →</a>` },
+      { icon: '🛠️', c: ['#ffd25a', '#ff8a3d'], title: 'Help us improve the pops',
+        msg: `Funny line or new idea? <a href="${GH}/pulls">Send a PR →</a>` },
+      { icon: '💧', c: ['#5ac8fa', '#3d7bf5'], title: 'Time for some water',
+        msg: 'Coffee is not water. Nice try. ☕' },
+      { icon: '👀', c: ['#ff4fa3', '#ee8b5f'], title: 'Blink a few times',
+        msg: 'You have been reading for a while. Your eyes noticed.' },
+    ].sort(() => Math.random() - 0.5);
+    const queue = [first, ...rest];
+    const LIFE = 7000, FIRST_DELAY = 4000, GAP = 16000;
+    const box = document.getElementById('live-pop');
+    const toast = document.getElementById('live-toast');
+    let hideTimer, nextTimer;
+
+    function show(pop) {
+      toast.style.setProperty('--c1', pop.c[0]);
+      toast.style.setProperty('--c2', pop.c[1]);
+      box.style.setProperty('--life', LIFE + 'ms');
+      document.getElementById('live-icon').textContent = pop.icon;
+      document.getElementById('live-title').textContent = pop.title;
+      document.getElementById('live-msg').innerHTML = pop.msg;
+      box.classList.remove('show');
+      void box.offsetWidth;          // restart the progress bar animation
+      box.classList.add('show');
+      hideTimer = setTimeout(hide, LIFE);
+    }
+    function hide() {
+      clearTimeout(hideTimer);
+      if (!box.classList.contains('show')) return;
+      box.classList.remove('show');
+      schedule(GAP);
+    }
+    function schedule(delay) {
+      clearTimeout(nextTimer);
+      if (!queue.length) return;
+      nextTimer = setTimeout(() => {
+        if (document.hidden) { schedule(2000); return; }
+        show(queue.shift());
+      }, delay);
+    }
+    toast.addEventListener('click', e => { if (!e.target.closest('a')) hide(); });
+    document.getElementById('live-close').addEventListener('click', e => { e.stopPropagation(); hide(); });
+    addEventListener('keydown', e => { if (e.key === 'Escape') hide(); });
+    schedule(FIRST_DELAY);
+  })();
 </script>
 </body>
 </html>
