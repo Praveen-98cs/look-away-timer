@@ -34,6 +34,11 @@
 | 💧 **Water** | A silly nudge every hour. Log a glass with <kbd>⌃⌥W</kbd>. |
 | 🧍 **Posture** | Five seconds, one cheeky line, gone. |
 | ✨ **Your own popups** | Pick a title, icon, colour and interval in a keyboard-first editor. |
+| 🐱 **Break cat** | A little cat turns up during eye breaks and does one cute thing: waves, grooms, stretches, naps, chases yarn. Seven coats, four ways in, never the same twice in a row. Switch it off under **Reminders → Break Cat**. |
+
+<p align="center">
+  <img src="docs/break-cat.jpg" alt="The break cat waving, chasing yarn, watching a butterfly, napping and sending hearts">
+</p>
 
 Every popup counts **real screen time** (lock, sleep or walk away and it starts over), **waits while you're in a call**, and can be tuned or switched off from the menu bar. No account, no network, no permissions. Native Swift, under 1 MB.
 
@@ -55,7 +60,7 @@ Needs Swift 5.9+ (Xcode or Command Line Tools). Run with `HEALTHYPOPS_DEBUG=1` f
 
 ## Contributing
 
-PRs are very welcome: funnier messages (`Sources/HealthyPops/NudgeToast.swift`), new built-in popups, fixes and ideas. Pushing a `v*` tag builds a universal DMG, publishes the release and deploys the website.
+PRs are very welcome: funnier messages (`Sources/HealthyPops/NudgeToast.swift`), new built-in popups, new cat coats or activities (`Sources/HealthyPops/BreakCat.swift`), fixes and ideas. Pushing a `v*` tag builds a universal DMG, publishes the release and deploys the website.
 
 ## License
 
