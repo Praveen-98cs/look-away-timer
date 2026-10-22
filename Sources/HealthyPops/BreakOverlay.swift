@@ -8,6 +8,8 @@ final class BreakOverlayModel: ObservableObject {
     @Published var adjusting = false
     /// Share of the break left, 1 → 0; drives the timeline bar.
     @Published var progress: Double = 1
+    /// This break's cat, or nil when the cat is switched off.
+    @Published var cat: BreakCat.Cast?
     @Published private(set) var duration = 20
 
     /// Set without feedback (e.g. when the overlay opens).
@@ -40,6 +42,8 @@ struct BreakView: View {
     let onSkip: () -> Void
     let onAdjust: () -> Void
     let onApply: () -> Void
+    /// Where the cat walks on this display, or nil for no cat here.
+    let catGround: CGFloat?
 
     var body: some View {
         ZStack {
@@ -49,6 +53,10 @@ struct BreakView: View {
                 endPoint: .bottom
             )
             .ignoresSafeArea()
+
+            if let cast = model.cat, let catGround {
+                BreakCat(groundInset: catGround, cast: cast)
+            }
 
             if model.adjusting {
                 adjustContent.transition(.opacity.combined(with: .scale(scale: 0.96)))
@@ -250,17 +258,21 @@ final class BreakOverlayController {
 
     var isVisible: Bool { !windows.isEmpty }
 
-    func show(breakDuration: Int) {
+    func show(breakDuration: Int, cat: Bool, catWater: Bool) {
         guard windows.isEmpty else { return }
         model.load(breakDuration)
         model.adjusting = false
         model.progress = 1
+        // Picked once per break; the cat mentions water when water reminders are on.
+        model.cat = cat ? BreakCat.Cast(water: catWater) : nil
 
         let front = NSWorkspace.shared.frontmostApplication
         previousApp = front?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : front
 
+        // One cat, on the display the pointer is on.
+        let catScreen = ReminderPanelController.activeScreen()
         for screen in NSScreen.screens {
-            let window = makeWindow(for: screen)
+            let window = makeWindow(for: screen, cat: screen == catScreen)
             window.alphaValue = 0
             window.orderFrontRegardless()
             windows.append(window)
@@ -380,7 +392,7 @@ final class BreakOverlayController {
         return nil
     }
 
-    private func makeWindow(for screen: NSScreen) -> NSWindow {
+    private func makeWindow(for screen: NSScreen, cat: Bool) -> NSWindow {
         let window = OverlayWindow(
             contentRect: screen.frame,
             styleMask: [.borderless],
@@ -403,7 +415,9 @@ final class BreakOverlayController {
             model: model,
             onSkip: { [weak self] in self?.onSkip?() },
             onAdjust: { [weak self] in self?.beginAdjust() },
-            onApply: { [weak self] in self?.apply() }
+            onApply: { [weak self] in self?.apply() },
+            // Walk along the top of the Dock; near the bottom edge if it's hidden or on a side.
+            catGround: cat ? max(screen.visibleFrame.minY - screen.frame.minY + 6, 36) : nil
         )
         let hosting = NSHostingView(rootView: view)
         hosting.frame = effect.bounds

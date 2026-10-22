@@ -70,7 +70,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     breakDuration: scheduler.config.breakDuration
                 )
             case .onBreak:
-                overlay.show(breakDuration: Int(scheduler.config.breakDuration))
+                overlay.show(breakDuration: Int(scheduler.config.breakDuration), cat: BreakCat.isEnabled,
+                             catWater: scheduler.config.waterEnabled)
                 overlay.update(remaining: scheduler.breakRemaining, total: scheduler.config.breakDuration)
             case .working:
                 if scheduler.inCall { nudges.hideAll() }
@@ -192,6 +193,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let postureToggle = item("Posture Reminders", #selector(togglePosture), key: "")
         postureToggle.state = scheduler.config.postureEnabled ? .on : .off
         menu.addItem(postureToggle)
+        let catToggle = item("Break Cat", #selector(toggleBreakCat), key: "")
+        catToggle.state = BreakCat.isEnabled ? .on : .off
+        menu.addItem(catToggle)
         let callToggle = item("Hold Breaks During Calls", #selector(toggleHoldDuringCalls), key: "")
         callToggle.state = scheduler.config.holdDuringCalls ? .on : .off
         menu.addItem(callToggle)
@@ -354,6 +358,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         scheduler.setWaterEnabled(!scheduler.config.waterEnabled)
         if !scheduler.config.waterEnabled { nudges.hide(.water) }
     }
+
+    @objc private func toggleBreakCat() { BreakCat.isEnabled.toggle() }
 
     @objc private func togglePosture() {
         scheduler.setPostureEnabled(!scheduler.config.postureEnabled)
