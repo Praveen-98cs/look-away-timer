@@ -70,8 +70,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     breakDuration: scheduler.config.breakDuration
                 )
             case .onBreak:
-                overlay.show(breakDuration: Int(scheduler.config.breakDuration), cat: BreakCat.isEnabled,
-                             catWater: scheduler.config.waterEnabled)
+                overlay.show(breakDuration: Int(scheduler.config.breakDuration), pet: BreakPet.choice,
+                             petWater: scheduler.config.waterEnabled)
                 overlay.update(remaining: scheduler.breakRemaining, total: scheduler.config.breakDuration)
             case .working:
                 if scheduler.inCall { nudges.hideAll() }
@@ -193,9 +193,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let postureToggle = item("Posture Reminders", #selector(togglePosture), key: "")
         postureToggle.state = scheduler.config.postureEnabled ? .on : .off
         menu.addItem(postureToggle)
-        let catToggle = item("Break Cat", #selector(toggleBreakCat), key: "")
-        catToggle.state = BreakCat.isEnabled ? .on : .off
-        menu.addItem(catToggle)
+        let petMenu = NSMenu()
+        for choice in BreakPet.Choice.allCases {
+            if choice == .off { petMenu.addItem(.separator()) }
+            let i = item(choice.title, #selector(setBreakPet(_:)), key: "")
+            i.representedObject = choice.rawValue
+            i.state = BreakPet.choice == choice ? .on : .off
+            petMenu.addItem(i)
+        }
+        let pet = NSMenuItem(title: "Break Pet", action: nil, keyEquivalent: "")
+        pet.submenu = petMenu
+        menu.addItem(pet)
         let callToggle = item("Hold Breaks During Calls", #selector(toggleHoldDuringCalls), key: "")
         callToggle.state = scheduler.config.holdDuringCalls ? .on : .off
         menu.addItem(callToggle)
@@ -359,7 +367,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !scheduler.config.waterEnabled { nudges.hide(.water) }
     }
 
-    @objc private func toggleBreakCat() { BreakCat.isEnabled.toggle() }
+    @objc private func setBreakPet(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let choice = BreakPet.Choice(rawValue: raw) else { return }
+        BreakPet.choice = choice
+    }
 
     @objc private func togglePosture() {
         scheduler.setPostureEnabled(!scheduler.config.postureEnabled)
